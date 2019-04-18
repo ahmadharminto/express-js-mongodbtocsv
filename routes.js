@@ -2,11 +2,14 @@ const router = require('express').Router();
 const User = require('./models/user');
 const ObjectId = require('mongoose').Types.ObjectId;
 const { Parser } = require('json2csv');
+const fs = require('fs');
+const path = require('path')
 const moment = require('moment');
 const mdq = require('mongo-date-query');
 
 router.get('/', function (req, res, next) {
-    User.find({_id: new ObjectId('5c1aaedf3b351a3320c299be')})
+    User.find({beauty: {$size: 1}})
+        .limit(10)
         .lean()
         .then(function (users) {
             const fields = [
@@ -31,15 +34,27 @@ router.get('/', function (req, res, next) {
                     stringify: true
                 },
                 {
-                    label: 'beauty_profile_val',
+                    label: 'beauty_profile_value',
                     value: 'beauty.subtags.name',
                     stringify: true
                 }
             ];
             const json2csvParser = new Parser({fields, unwind: ['beauty', 'beauty.subtags']});
             const csv = json2csvParser.parse(users);
-            console.log(csv);
-            res.send(users);
+            
+            const dateTime = moment().format('YYYYMMDDhhmmss');
+            const filePath = path.join(__dirname, "exports", "csv-" + dateTime + ".csv");
+            fs.writeFile(filePath, csv, function (err) {
+                if (err) {
+                    res.json(err).status(500);
+                }
+                else {
+                    setTimeout(function () {
+                        fs.unlinkSync(filePath);
+                    }, 30000)
+                    res.json("/exports/csv-" + dateTime + ".csv");
+                }
+            });
         })
         .catch(next);
 });
